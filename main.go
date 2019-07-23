@@ -59,9 +59,7 @@ func main() {
 	var start string
 
 	flag.StringVar(&start, "s", "", "A start date represented in the form YYYY-MM-DD.")
-
 	flag.Parse()
-	fmt.Println(start)
 
 	var startDateTime time.Time
 
@@ -111,31 +109,64 @@ func main() {
 		return t[i].TimeInterval.Start.Before(t[j].TimeInterval.End)
 	})
 
-	f := excelize.NewFile()
-	f.SetCellValue("Sheet1", "A1", "Start")
-	f.SetCellValue("Sheet1", "B1", "End")
-	f.SetCellValue("Sheet1", "C1", "Duration")
-	f.SetCellValue("Sheet1", "D1", "Task")
-	f.SetCellValue("Sheet1", "E1", "Description")
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	for i, e := range t {
-		cN, err := excelize.CoordinatesToCellName(1, i+2)
+	f := excelize.NewFile()
+	// dateStyle, err := f.NewStyle(`{"number_format":22 }`)
+
+	var currentMonth string
+	var currentSheetLine int
+	var sheet int
+
+	// for i := len(t)/2 - 1; i >= 0; i-- {
+	// 	opp := len(t) - 1 - i
+	// 	t[i], t[opp] = t[opp], t[i]
+	// }
+
+	for _, e := range t {
+
+		newMonth := e.TimeInterval.Start.Format("Jan")
+
+		if newMonth != currentMonth {
+			fmt.Println("Writing month " + newMonth)
+
+			currentMonth = newMonth
+			sheet = f.NewSheet(currentMonth)
+			f.SetActiveSheet(sheet)
+			f.DeleteSheet("Sheet1")
+
+			f.SetCellValue(currentMonth, "A1", "Start")
+			f.SetCellValue(currentMonth, "B1", "End")
+			f.SetCellValue(currentMonth, "C1", "Duration")
+			f.SetCellValue(currentMonth, "D1", "Task")
+			f.SetCellValue(currentMonth, "E1", "Description")
+
+			currentSheetLine = 0
+		}
+
+		cN, err := excelize.CoordinatesToCellName(1, currentSheetLine+2)
 
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		f.SetCellValue("Sheet1", cN, e.TimeInterval.Start)
-		cN, err = excelize.CoordinatesToCellName(2, i+2)
-		f.SetCellValue("Sheet1", cN, e.TimeInterval.End)
-		cN, err = excelize.CoordinatesToCellName(3, i+2)
-		f.SetCellValue("Sheet1", cN, e.TimeInterval.End.Sub(e.TimeInterval.Start))
+		f.SetCellValue(currentMonth, cN, e.TimeInterval.Start.Add(2*time.Hour))
+		// f.SetCellStyle(currentMonth, cN, cN, dateStyle)
+
+		cN, err = excelize.CoordinatesToCellName(2, currentSheetLine+2)
+		f.SetCellValue(currentMonth, cN, e.TimeInterval.End.Add(2*time.Hour))
+		cN, err = excelize.CoordinatesToCellName(3, currentSheetLine+2)
+		f.SetCellValue(currentMonth, cN, e.TimeInterval.End.Sub(e.TimeInterval.Start))
 		descr := strings.Split(e.Description, ":")
-		cN, err = excelize.CoordinatesToCellName(4, i+2)
-		f.SetCellValue("Sheet1", cN, strings.Trim(descr[0], ""))
-		cN, err = excelize.CoordinatesToCellName(5, i+2)
-		f.SetCellValue("Sheet1", cN, strings.Trim(descr[1], ""))
+		cN, err = excelize.CoordinatesToCellName(4, currentSheetLine+2)
+		f.SetCellValue(currentMonth, cN, strings.Trim(descr[0], " "))
+		cN, err = excelize.CoordinatesToCellName(5, currentSheetLine+2)
+		f.SetCellValue(currentMonth, cN, strings.Trim(descr[1], " "))
+
+		currentSheetLine++
 	}
 
 	err = f.SaveAs("./timesheet_" + time.Now().Format("2006-01-02") + ".xlsx")
